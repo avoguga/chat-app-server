@@ -2,6 +2,7 @@ import express from 'express'
 import { createServer } from 'http'
 import cors from 'cors'
 import helmet from 'helmet'
+import path from 'path'
 import { env } from './config/env.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import routes from './routes/index.js'
@@ -11,7 +12,9 @@ const app = express()
 const httpServer = createServer(app)
 
 // Middleware
-app.use(helmet())
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}))
 
 // CORS - permite múltiplas origens em desenvolvimento
 const allowedOrigins = [
@@ -37,6 +40,9 @@ app.use(
   })
 )
 app.use(express.json())
+
+// Servir arquivos de upload
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
 
 // Routes
 app.use('/api', routes)

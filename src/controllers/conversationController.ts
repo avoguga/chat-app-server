@@ -234,3 +234,171 @@ export async function getOrCreateDirectConversation(
     next(error)
   }
 }
+
+export async function createGroup(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { name, participantIds } = req.body
+    const userId = req.user!.userId
+
+    if (!name || !participantIds || !Array.isArray(participantIds)) {
+      throw new AppError('Nome e participantes são obrigatórios', 400, 'INVALID_REQUEST')
+    }
+
+    if (participantIds.length < 1) {
+      throw new AppError('Adicione pelo menos 1 participante', 400, 'INVALID_REQUEST')
+    }
+
+    const allParticipants = [...new Set([userId, ...participantIds])]
+
+    const conversation = await prisma.conversation.create({
+      data: {
+        type: 'GROUP',
+        name,
+        participants: {
+          create: allParticipants.map((id) => ({
+            userId: id,
+            isAdmin: id === userId,
+          })),
+        },
+      },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                isOnline: true,
+                lastSeen: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    res.status(201).json({ conversation })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function updateGroup(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const groupId = req.params.id as string
+    const userId = req.user!.userId
+    const { name, addParticipants, removeParticipants } = req.body
+
+    // Verificar se é admin
+    const participant = await prisma.participant.findFirst({
+      where: {
+        conversationId: groupId,
+        userId,
+        isAdmin: true,
+      },
+    })
+
+    if (!participant) {
+      throw new AppError('Apenas admins podem editar o grupo', 403, 'NOT_ADMIN')
+    }
+
+    // Atualizar nome se fornecido
+    if (name) {
+      await prisma.conversation.update({
+        where: { id: groupId },
+        data: { name },
+      })
+    }
+
+    // Adicionar participantes
+    if (addParticipants && Array.isArray(addParticipants)) {
+      for (const participantId of addParticipants) {
+        await prisma.participant.upsert({
+          where: {
+            userId_conversationId: {
+              userId: participantId,
+              conversationId: groupId,
+            },
+          },
+          create: {
+            userId: participantId,
+            conversationId: groupId,
+          },
+          update: {},
+        })
+      }
+    }
+
+    // Remover participantes
+    if (removeParticipants && Array.isArray(removeParticipants)) {
+      await prisma.participant.deleteMany({
+        where: {
+          conversationId: groupId,
+          userId: { in: removeParticipants },
+          isAdmin: false, // Não pode remover admins
+        },
+      })
+    }
+
+    // Retornar grupo atualizado
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: groupId },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                isOnline: true,
+                lastSeen: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    res.json({ conversation })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function leaveGroup(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const groupId = req.params.id as string
+    const userId = req.user!.userId
+
+    await prisma.participant.delete({
+      where: {
+        userId_conversationId: {
+          userId,
+          conversationId: groupId,
+        },
+      },
+    })
+
+    res.json({ success: true })
+  } catch (error) {
+    next(error)
+  }
+}

@@ -5,6 +5,12 @@ import { AuthenticatedSocket } from '../index.js'
 interface SendMessagePayload {
   conversationId: string
   content: string
+  type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+  mediaUrl?: string
+  fileName?: string
+  fileSize?: number
+  mimeType?: string
+  duration?: number
 }
 
 interface ReadMessagePayload {
@@ -37,8 +43,13 @@ export function handleMessages(io: Server, socket: AuthenticatedSocket) {
           content,
           senderId: socket.userId,
           conversationId,
-          type: 'TEXT',
+          type: data.type || 'TEXT',
           status: 'SENT',
+          mediaUrl: data.mediaUrl,
+          fileName: data.fileName,
+          fileSize: data.fileSize,
+          mimeType: data.mimeType,
+          duration: data.duration,
         },
       })
 

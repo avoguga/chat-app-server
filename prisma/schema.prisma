@@ -74,6 +74,13 @@ model Message {
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?
 
+  // Campos para mídia
+  mediaUrl      String?
+  fileName      String?
+  fileSize      Int?
+  mimeType      String?
+  duration      Int?    // Duração em segundos para audio/video
+
   sender       User         @relation("SentMessages", fields: [senderId], references: [id])
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -84,6 +91,8 @@ model Message {
 enum MessageType {
   TEXT
   IMAGE
+  VIDEO
+  AUDIO
   FILE
   SYSTEM
 }
